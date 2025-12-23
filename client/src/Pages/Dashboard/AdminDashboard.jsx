@@ -40,7 +40,13 @@ export default function AdminDashboard() {
   const { allPayments } = useSelector(
     (state) => state.razorpay
   );
-  const monthlySalesRecord = [1, 3, 7, 8, 10, 0, 5]
+  const monthlySalesRecord = new Array(12).fill(0);
+  if (allPayments?.allPayments) {
+    allPayments.allPayments.forEach((payment) => {
+      const monthNumber = new Date(payment.createdAt).getMonth();
+      monthlySalesRecord[monthNumber] += 1;
+    });
+  }
 
   const userData = {
     labels: ["Registered User", "Enrolled User"],
