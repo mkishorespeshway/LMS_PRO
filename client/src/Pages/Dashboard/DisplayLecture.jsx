@@ -41,16 +41,32 @@ export default function DisplayLecture() {
             {/* left section for lecture video and details */}
             <div className="md:w-[48%] w-full md:p-3 p-1 overflow-y-scroll md:h-full h-[40%] flex justify-center">
               <div className="w-full h-[170px] border bg-[#0000003d] shadow-lg">
-                <video
-                  src={
-                    lectures && lectures?.[currentVideo]?.lecture?.secure_url
-                  }
-                  disablePictureInPicture
-                  disableRemotePlayback
-                  controls
-                  controlsList="nodownload"
-                  className="h-full mx-auto"
-                ></video>
+                {lectures && lectures?.[currentVideo]?.lecture?.secure_url && (
+                  lectures[currentVideo].lecture.secure_url.includes("youtube.com") ||
+                  lectures[currentVideo].lecture.secure_url.includes("youtu.be") ? (
+                    <iframe
+                      src={`https://www.youtube.com/embed/${
+                        lectures[currentVideo].lecture.secure_url.split("v=")[1]?.split("&")[0] ||
+                        lectures[currentVideo].lecture.secure_url.split("youtu.be/")[1]?.split("&")[0]
+                      }`}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="h-full w-full"
+                    ></iframe>
+                  ) : (
+                    <video
+                      src={
+                        lectures && lectures?.[currentVideo]?.lecture?.secure_url
+                      }
+                      disablePictureInPicture
+                      disableRemotePlayback
+                      controls
+                      controlsList="nodownload"
+                      className="h-full mx-auto"
+                    ></video>
+                  )
+                )}
                 <div className="py-7">
                   <h1 className="text-[17px] text-gray-700 font-[500] dark:text-white font-lato">
                     <span className="text-blue-500 dark:text-yellow-500 font-inter font-semibold text-lg">

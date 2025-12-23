@@ -31,13 +31,20 @@ const courseSchema = new Schema({
         {
             title: String,
             description: String,
-            lecture: {
+      duration: String, // New duration field
+      lecture: {
                 public_id: {
-                    type: String 
+                    type: String,
+                    required: false
                 },
                 secure_url: {
-                    type: String
+                    type: String,
+                    required: false
                 }
+            },
+            duration: {
+                type: String,
+                required: false
             }
         }
     ],

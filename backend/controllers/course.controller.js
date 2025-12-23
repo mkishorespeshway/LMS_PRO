@@ -2,6 +2,7 @@ import courseModel from '../models/course.model.js'
 import AppError from '../utils/error.utils.js';
 import cloudinary from 'cloudinary';
 import fs from 'fs';
+import { videoDuration } from "@numairawan/video-duration";
 
 // get all courses
 const getAllCourses = async (req, res, next) => {
@@ -159,26 +160,45 @@ const removeCourse = async (req, res, next) => {
 // add lecture to course by id
 const addLectureToCourseById = async (req, res, next) => {
     try {
-        const { title, description } = req.body;
+const { title, description, videoUrl, duration } = req.body;
         const { id } = req.params;
 
-        if (!title || !description) {
-            return next(new AppError('all fields are required', 500));
+        if (!title || !description || (!req.file && !videoUrl)) {
+            return next(new AppError('All fields are required, and either a video file or a video URL must be provided.', 400));
+        }
+
+        if (req.file && videoUrl) {
+            return next(new AppError('Please provide either a video file or a video URL, not both.', 400));
         }
 
         const course = await courseModel.findById(id);
 
         if (!course) {
-            return next(new AppError('course with given id does not exist', 500));
+            return next(new AppError('course with given id does not exist', 400));
+        }
+
+        let lectureDuration = duration; // Use provided duration if available
+
+        if (videoUrl && !lectureDuration) {
+            try {
+                const fetchedDuration = await videoDuration(videoUrl);
+                // Format duration as needed, e.g., "1h 30m" or "90m"
+                // For simplicity, let's store in seconds for now and format on frontend if needed
+                lectureDuration = `${Math.round(fetchedDuration / 60)}m`; // Example: convert seconds to minutes
+            } catch (error) {
+                console.error("Error fetching video duration:", error);
+                // Optionally, handle error or proceed without duration
+            }
         }
 
         const lectureData = {
             title,
             description,
-            lecture: {}
+            lecture: {},
+            duration: lectureDuration
         }
 
-        // file upload
+        // file upload or video URL
         if (req.file) {
             try {
                 const result = await cloudinary.v2.uploader.upload(req.file.path, {
@@ -190,10 +210,17 @@ const addLectureToCourseById = async (req, res, next) => {
                     lectureData.lecture.secure_url = result.secure_url;
                 }
 
+                if (!lectureDuration) {
+                    const fetchedDuration = await videoDuration(req.file.path);
+                    lectureDuration = `${Math.round(fetchedDuration / 60)}m`;
+                }
+
                 fs.rmSync(`uploads/${req.file.filename}`);
             } catch (e) {
                  return next(new AppError(e.message, 500));
             }
+        } else if (videoUrl) {
+            lectureData.lecture.secure_url = videoUrl;
         }
 
         course.lectures.push(lectureData);
@@ -248,10 +275,14 @@ const deleteCourseLecture = async (req, res, next) => {
 const updateCourseLecture = async (req, res, next) => {
     try {
         const { courseId, lectureId } = req.query;
-        const { title, description } = req.body;
+        const { title, description, videoUrl, duration } = req.body;
 
-        if (!title || !description) {
-            return next(new AppError('All fields are required', 400));
+        if (!title || !description || (!req.file && !videoUrl)) {
+            return next(new AppError('All fields are required, and either a video file or a video URL must be provided.', 400));
+        }
+
+        if (req.file && videoUrl) {
+            return next(new AppError('Please provide either a video file or a video URL, not both.', 400));
         }
 
         const course = await courseModel.findById(courseId);
@@ -266,16 +297,34 @@ const updateCourseLecture = async (req, res, next) => {
             return next(new AppError('Lecture not found in the course', 404));
         }
 
+        let lectureDuration = duration; // Use provided duration if available
+
+        if (videoUrl && !lectureDuration) {
+            try {
+                const fetchedDuration = await videoDuration(videoUrl);
+                lectureDuration = `${Math.round(fetchedDuration / 60)}m`;
+            } catch (error) {
+                console.error("Error fetching video duration:", error);
+            }
+        }
+
         const updatedLectureData = {
             title,
             description,
             lecture: {
-                public_id: course.lectures[lectureIndex].lecture.public_id,
-                secure_url: course.lectures[lectureIndex].lecture.secure_url
-            }
+                public_id: null,
+                secure_url: null
+            },
+            duration: lectureDuration
         };
 
-        if (req.file) {
+        if (videoUrl) {
+            updatedLectureData.lecture.secure_url = videoUrl;
+            // If there's an existing video, delete the old one from Cloudinary
+            if (course.lectures[lectureIndex].lecture.public_id) {
+                await cloudinary.v2.uploader.destroy(course.lectures[lectureIndex].lecture.public_id);
+            }
+        } else if (req.file) {
             try {
                 const result = await cloudinary.v2.uploader.upload(req.file.path, {
                     folder: 'Learning-Management-System',
@@ -284,6 +333,11 @@ const updateCourseLecture = async (req, res, next) => {
                 if (result) {
                     updatedLectureData.lecture.public_id = result.public_id;
                     updatedLectureData.lecture.secure_url = result.secure_url;
+                }
+
+                if (!lectureDuration) {
+                    const fetchedDuration = await videoDuration(req.file.path);
+                    lectureDuration = `${Math.round(fetchedDuration / 60)}m`;
                 }
 
                 // If there's an existing video, delete the old one from Cloudinary

@@ -22,6 +22,8 @@ export default function AddLecture() {
     title: "",
     description: "",
     videoSrc: "",
+    videoUrl: "",
+    duration: "",
   });
 
   function handleInputChange(e) {
@@ -33,28 +35,51 @@ export default function AddLecture() {
   }
 
   function handleVideo(e) {
-    const video = e.target.files[0];
-    const source = window.URL.createObjectURL(video);
-    setUserInput({
-      ...userInput,
-      lecture: video,
-      videoSrc: source,
-    });
+    const videoFile = e.target.files[0];
+    const source = window.URL.createObjectURL(videoFile);
+
+    const videoElement = document.createElement('video');
+    videoElement.preload = 'metadata';
+    videoElement.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(videoElement.src);
+      const duration = videoElement.duration;
+      const minutes = Math.floor(duration / 60);
+      const seconds = Math.floor(duration % 60);
+      const formattedDuration = `${minutes}m ${seconds}s`;
+
+      setUserInput((prevInput) => ({
+        ...prevInput,
+        lecture: videoFile,
+        videoSrc: source,
+        duration: formattedDuration,
+      }));
+    };
+    videoElement.src = source;
   }
 
   async function onFormSubmit(e) {
     e.preventDefault();
-    if (!userInput.lecture || !userInput.title || !userInput.description) {
-      toast.error("All fields are mandatory");
+    if ((!userInput.lecture && !userInput.videoUrl) || !userInput.title || !userInput.description) {
+      toast.error("All fields are mandatory, and either a video file or a video URL must be provided.");
+      return;
+    }
+
+    if (userInput.lecture && userInput.videoUrl) {
+      toast.error("Please provide either a video file or a video URL, not both.");
       return;
     }
 
     setIsLoading(true);
 
     const formData = new FormData();
-    formData.append("lecture", userInput.lecture);
+    if (userInput.lecture) {
+      formData.append("lecture", userInput.lecture);
+    } else if (userInput.videoUrl) {
+      formData.append("videoUrl", userInput.videoUrl);
+    }
     formData.append("title", userInput.title);
     formData.append("description", userInput.description);
+    formData.append("duration", userInput.duration);
 
     const data = { formData, id: userInput.id };
 
@@ -67,6 +92,8 @@ export default function AddLecture() {
         title: "",
         description: "",
         videoSrc: "",
+        videoUrl: "",
+        duration: "",
       });
     }
     setIsLoading(false);
@@ -152,6 +179,24 @@ export default function AddLecture() {
                 placeholder={"Enter Lecture Description"}
                 onChange={handleInputChange}
                 value={userInput.description}
+              />
+              {/* video url */}
+              <InputBox
+                label={"Video URL"}
+                name={"videoUrl"}
+                type={"text"}
+                placeholder={"Enter Video URL"}
+                onChange={handleInputChange}
+                value={userInput.videoUrl}
+              />
+              {/* duration */}
+              <InputBox
+                label={"Duration"}
+                name={"duration"}
+                type={"text"}
+                placeholder={"Enter Video Duration (e.g., 1h 30m)"}
+                onChange={handleInputChange}
+                value={userInput.duration}
               />
             </div>
           </div>
