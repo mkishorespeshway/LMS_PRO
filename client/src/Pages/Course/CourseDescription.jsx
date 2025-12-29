@@ -64,7 +64,7 @@ export default function CourseDescription() {
               </p>
             </div>
 
-            {role === "ADMIN" || data?.subscription?.status === "active" ? (
+            {role === "ADMIN" || data?.courseProgress?.some((cp) => cp.courseId === state?._id) ? (
               <button
                 onClick={() =>
                   navigate("/course/displaylectures", { state: { ...state } })

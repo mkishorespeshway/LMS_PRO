@@ -75,9 +75,34 @@ const getLecturesByCourseId = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const course = await courseModel.findById(id)
+        const course = await courseModel.findById(id);
         if (!course) {
             return next(new AppError('course not found', 500));
+        }
+
+        // Check enrollment if user is not admin
+        if (req.user.role !== 'ADMIN') {
+            const user = await userModel.findById(req.user.id);
+            const isEnrolled = user.courseProgress.some(
+                (cp) => cp.courseId.toString() === id
+            );
+
+            if (!isEnrolled) {
+                // Return course without lectures if not enrolled
+                course.lectures = [];
+                return res.status(200).json({
+                    success: true,
+                    message: 'Course fetched (lectures hidden)',
+                    course
+                });
+                // Alternatively, return 403:
+                // return next(new AppError('You are not enrolled in this course', 403));
+                // But the frontend might use this endpoint to get course details too?
+                // Looking at frontend: DisplayLecture calls getCourseLectures(state._id).
+                // CourseDescription passes state (course data) from the list.
+                // So getLecturesByCourseId is likely used specifically for watching lectures.
+                // Let's restrict it.
+            }
         }
 
         res.status(200).json({

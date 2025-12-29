@@ -126,20 +126,43 @@ export default function AddLecture() {
     if (!courseDetails) navigate("/courses");
 
     const fetchVideoDuration = async () => {
-      if (userInput.videoUrl || userInput.driveUrl) {
-        try {
-          const urlToFetch = userInput.driveUrl || userInput.videoUrl;
-          const response = await axiosInstance.post('/courses/get-video-duration', { videoUrl: urlToFetch });
-          setUserInput((prevInput) => ({ ...prevInput, duration: response.data.duration }));
-        } catch (error) {
-          console.error("Error fetching video duration:", error);
-          toast.error("Failed to fetch video duration.");
-          setUserInput((prevInput) => ({ ...prevInput, duration: "" }));
+      const urlToFetch = userInput.driveUrl || userInput.videoUrl;
+      
+      if (!urlToFetch) return;
+
+      // Regex patterns (matching backend validation)
+      const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([^\&\?\n]{11})/;
+      const googleDriveRegex = /(?:https?:\/\/)?drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/view)?(?:\?usp=sharing)?/;
+
+      if (!youtubeRegex.test(urlToFetch) && !googleDriveRegex.test(urlToFetch)) {
+          // Do not fetch if URL format is invalid to avoid 400 errors
+          return;
+      }
+
+      try {
+        const response = await axiosInstance.post('/courses/get-video-duration', { videoUrl: urlToFetch });
+        setUserInput((prevInput) => ({ ...prevInput, duration: response.data.duration }));
+      } catch (error) {
+        console.error("Error fetching video duration:", error);
+        // Only toast if it's a server error, not for bad requests which we try to filter client-side
+        // But if we filter client-side, 400 shouldn't happen often. 
+        // If it does, it might be a genuine issue, so keeping the toast but maybe making it less intrusive?
+        // Actually, if we filter correctly, we shouldn't get 400.
+        // If we get other errors (500), we should show toast.
+        if (error.response && error.response.status !== 400) {
+             toast.error("Failed to fetch video duration.");
         }
+        setUserInput((prevInput) => ({ ...prevInput, duration: "" }));
       }
     };
 
-    fetchVideoDuration();
+    // Debounce the fetch to avoid too many requests while typing
+    const timeoutId = setTimeout(() => {
+        fetchVideoDuration();
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+
   }, [courseDetails, navigate, userInput.videoUrl, userInput.driveUrl]);
 
   return (

@@ -15,10 +15,18 @@ export default function DisplayLecture() {
   const dispatch = useDispatch();
   const { state } = useLocation();
   const { lectures } = useSelector((state) => state.lecture);
-  const { role } = useSelector((state) => state.auth);
+  const { role, data } = useSelector((state) => state.auth);
 
   const [currentVideo, setCurrentVideo] = useState(0);
   const [userProgress, setUserProgress] = useState({ lecturesCompleted: [] }); // New state for user progress
+
+  useEffect(() => {
+    if (!state) navigate("/courses");
+    if (role !== "ADMIN" && !data?.courseProgress?.some((cp) => cp.courseId === state?._id)) {
+        toast.error("You are not enrolled in this course");
+        navigate("/courses");
+    }
+  }, [role, data, state, navigate]);
 
   const totalLectures = state?.numberOfLectures || 0; // Define totalLectures
   const completedLectures = userProgress.lecturesCompleted.length; // Calculate completedLectures

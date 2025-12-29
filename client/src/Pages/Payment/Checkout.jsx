@@ -104,28 +104,31 @@ export default function Checkout() {
     })();
 
     // Check the user's subscription status
-    switch (userData?.subscription?.status) {
-      case "active":
-        // Navigate outside of the switch statement
+    // The previous logic redirected to /courses if subscription status was 'active'.
+    // This is incorrect for the new per-course purchase model.
+    // We should only redirect if the user has ALREADY purchased THIS SPECIFIC course.
+    
+    // However, the checkout page is generic. It receives courseId via location state.
+    // We should check if the user is already enrolled in THIS course.
+    
+    if (userData?.courseProgress?.some((cp) => cp.courseId === courseId)) {
+        toast.error("You are already enrolled in this course");
         navigate("/courses");
-        break;
-
-      // if already created subscription, then use previous id for this
-      // case "created":
-      //   setOrder_id(userData?.subscription?.id);
-      //   break;
-
-      default:
-        // If the user doesn't have a subscription, purchase a bundle
-        (async () => {
-          const response = await dispatch(purchaseCourseBundle({courseId, coursePrice}));
-          if (response?.payload?.order_id) {
-            setOrder_id(response.payload.order_id);
-          }
-        })();
-        break;
+        return;
     }
-  }, [dispatch, navigate, userData]);
+
+    // Original switch case removed as it was based on global subscription model
+    // which conflicts with per-course purchase model.
+    
+    (async () => {
+        // Always create a new order for the course purchase
+        const response = await dispatch(purchaseCourseBundle({courseId, coursePrice}));
+        if (response?.payload?.order_id) {
+            setOrder_id(response.payload.order_id);
+        }
+    })();
+
+  }, [dispatch, navigate, userData, courseId, coursePrice]);
   return (
     <Layout>
       <section className="flex flex-col gap-6 items-center py-8 px-3 min-h-[100vh]">
