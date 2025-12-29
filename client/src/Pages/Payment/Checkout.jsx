@@ -111,9 +111,9 @@ export default function Checkout() {
         break;
 
       // if already created subscription, then use previous id for this
-      case "created":
-        setOrder_id(userData?.subscription?.id);
-        break;
+      // case "created":
+      //   setOrder_id(userData?.subscription?.id);
+      //   break;
 
       default:
         // If the user doesn't have a subscription, purchase a bundle
