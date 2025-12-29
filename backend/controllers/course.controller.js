@@ -1,16 +1,11 @@
 import courseModel from '../models/course.model.js'
 import userModel from '../models/user.model.js'
-import quizModel from '../models/quiz.model.js'
-import progressModel from '../models/progress.model.js'
-import certificateModel from '../models/certificate.model.js'
 import AppError from '../utils/error.utils.js';
 import cloudinary from 'cloudinary';
 import fs from 'fs';
 import { videoDuration } from "@numairawan/video-duration";
 import axios from 'axios';
 import { google } from 'googleapis';
-import PDFDocument from 'pdfkit';
-import path from 'path';
 
 // Helper function to convert ISO 8601 duration to a readable format
 const convertIsoToDuration = (isoDuration) => {
@@ -163,26 +158,6 @@ const createCourse = async (req, res, next) => {
         }
 
         await course.save();
-
-        // Sync with Quiz Entity
-        const existingQuiz = await quizModel.findOne({ course: id });
-        if (existingQuiz) {
-            existingQuiz.questions = course.quizzes.map(q => ({
-                question: q.question,
-                options: q.options,
-                correctAnswer: q.correctAnswer
-            }));
-            await existingQuiz.save();
-        } else {
-            await quizModel.create({
-                course: id,
-                questions: course.quizzes.map(q => ({
-                    question: q.question,
-                    options: q.options,
-                    correctAnswer: q.correctAnswer
-                }))
-            });
-        }
 
         res.status(200).json({
             success: true,
@@ -569,26 +544,6 @@ const addQuizToCourse = async (req, res, next) => {
 
         await course.save();
 
-        // Sync with Quiz Entity
-        const existingQuiz = await quizModel.findOne({ course: id });
-        if (existingQuiz) {
-            existingQuiz.questions = course.quizzes.map(q => ({
-                question: q.question,
-                options: q.options,
-                correctAnswer: q.correctAnswer
-            }));
-            await existingQuiz.save();
-        } else {
-            await quizModel.create({
-                course: id,
-                questions: course.quizzes.map(q => ({
-                    question: q.question,
-                    options: q.options,
-                    correctAnswer: q.correctAnswer
-                }))
-            });
-        }
-
         res.status(200).json({
             success: true,
             message: 'Quiz added successfully',
@@ -631,187 +586,6 @@ const getEnrolledStudents = async (req, res, next) => {
     }
 }
 
-// Submit Quiz and Automatic Scoring
-const submitQuizAnswers = async (req, res, next) => {
-    try {
-        const { id } = req.params; // courseId
-        const { answers } = req.body; // Array of { questionId, answer }
-        const userId = req.user.id;
-
-        const course = await courseModel.findById(id);
-        if (!course) {
-            return next(new AppError('Course not found', 404));
-        }
-
-        let score = 0;
-        const results = course.quizzes.map((quiz) => {
-            const userAnswer = answers.find((ans) => ans.questionId === quiz._id.toString());
-            const isCorrect = userAnswer && userAnswer.answer === quiz.correctAnswer;
-            if (isCorrect) score++;
-            return {
-                quizId: quiz._id,
-                isCorrect,
-                correctAnswer: quiz.correctAnswer
-            };
-        });
-
-        // Update User Progress
-        const user = await userModel.findById(userId);
-        const courseProgress = user.courseProgress.find((cp) => cp.courseId.toString() === id);
-        
-        if (courseProgress) {
-            courseProgress.quizScores.push({
-                quizId: id, // Using courseId as generic quiz group ID for now
-                score: (score / course.quizzes.length) * 100
-            });
-            await user.save();
-
-            // Sync with Progress Entity (Status check)
-            const existingProgress = await progressModel.findOne({ student: userId, course: id });
-            if (existingProgress) {
-                existingProgress.status = courseProgress.isCompleted ? 'Completed' : 'In Progress';
-                await existingProgress.save();
-            }
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Quiz submitted successfully',
-            score,
-            total: course.quizzes.length,
-            percentage: (score / course.quizzes.length) * 100,
-            results
-        });
-    } catch (e) {
-        return next(new AppError(e.message, 500));
-    }
-};
-
-// Update Course Progress
-const updateCourseProgress = async (req, res, next) => {
-    try {
-        const { id } = req.params; // courseId
-        const { lectureId } = req.body;
-        const userId = req.user.id;
-
-        const user = await userModel.findById(userId);
-        const courseProgress = user.courseProgress.find((cp) => cp.courseId.toString() === id);
-
-        if (!courseProgress) {
-            return next(new AppError('You are not enrolled in this course', 403));
-        }
-
-        if (!courseProgress.lecturesCompleted.includes(lectureId)) {
-            courseProgress.lecturesCompleted.push(lectureId);
-        }
-
-        // Check for course completion
-        const course = await courseModel.findById(id);
-        const totalLectures = course.lectures.length;
-        
-        if (courseProgress.lecturesCompleted.length === totalLectures) {
-            courseProgress.isCompleted = true;
-        }
-
-        await user.save();
-
-        // Sync with Progress Entity
-        const existingProgress = await progressModel.findOne({ student: userId, course: id });
-        if (existingProgress) {
-            existingProgress.lessonsCompleted = courseProgress.lecturesCompleted;
-            existingProgress.status = courseProgress.isCompleted ? 'Completed' : 'In Progress';
-            await existingProgress.save();
-        } else {
-            await progressModel.create({
-                student: userId,
-                course: id,
-                lessonsCompleted: courseProgress.lecturesCompleted,
-                status: courseProgress.isCompleted ? 'Completed' : 'In Progress'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Progress updated successfully',
-            courseProgress
-        });
-    } catch (e) {
-        return next(new AppError(e.message, 500));
-    }
-};
-
-// Generate Certificate
-const generateCertificate = async (req, res, next) => {
-    try {
-        const { id } = req.params; // courseId
-        const userId = req.user.id;
-
-        const user = await userModel.findById(userId);
-        const course = await courseModel.findById(id);
-        const progress = user.courseProgress.find((cp) => cp.courseId.toString() === id);
-
-        if (!progress || !progress.isCompleted) {
-            return next(new AppError('Course not completed yet', 400));
-        }
-
-        const doc = new PDFDocument({ layout: 'landscape', size: 'A4' });
-        const fileName = `Certificate_${user.fullName.replace(' ', '_')}_${course.title.replace(' ', '_')}.pdf`;
-        
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
-
-        doc.pipe(res);
-
-        // Certificate Content
-        doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).stroke();
-        
-        doc.fontSize(40).text('CERTIFICATE OF COMPLETION', { align: 'center' }).moveDown();
-        doc.fontSize(20).text('This is to certify that', { align: 'center' }).moveDown();
-        doc.fontSize(30).fillColor('#eab308').text(user.fullName.toUpperCase(), { align: 'center' }).fillColor('black').moveDown();
-        doc.fontSize(20).text('has successfully completed the course', { align: 'center' }).moveDown();
-        doc.fontSize(25).text(course.title, { align: 'center' }).moveDown();
-        doc.fontSize(15).text(`Issued on: ${new Date().toLocaleDateString()}`, { align: 'center' }).moveDown(2);
-        
-        doc.fontSize(20).text('_________________________', { align: 'left', indent: 50 });
-        doc.text('Instructor', { align: 'left', indent: 80 });
-        
-        doc.end();
-
-        // Create Certificate Entity record if not already exists
-        const existingCertificate = await certificateModel.findOne({ user: userId, course: id });
-        if (!existingCertificate) {
-            await certificateModel.create({
-                user: userId,
-                course: id,
-                dateIssued: new Date()
-            });
-        }
-
-    } catch (e) {
-        return next(new AppError(e.message, 500));
-    }
-};
-
-// Monitor student progress (Admin Only)
-const getStudentProgress = async (req, res, next) => {
-    try {
-        const { courseId } = req.params;
-
-        // Fetch all progress records for this course
-        const progresses = await progressModel.find({ course: courseId })
-            .populate('student', 'fullName email')
-            .sort({ updatedAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            message: 'Student progress fetched successfully',
-            progresses
-        });
-    } catch (e) {
-        return next(new AppError(e.message, 500));
-    }
-}
-
 export {
     getAllCourses,
     getLecturesByCourseId,
@@ -823,9 +597,5 @@ export {
     updateCourseLecture,
     getVideoDuration,
     addQuizToCourse,
-    getEnrolledStudents,
-    submitQuizAnswers,
-    updateCourseProgress,
-    generateCertificate,
-    getStudentProgress
+    getEnrolledStudents
 }

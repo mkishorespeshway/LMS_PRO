@@ -1,6 +1,5 @@
 import paymentModel from '../models/payment.model.js'
 import userModel from "../models/user.model.js";
-import enrollmentModel from '../models/enrollment.model.js';
 import AppError from "../utils/error.utils.js";
 import { razorpay } from "../server.js";
 import crypto from 'crypto';
@@ -98,12 +97,6 @@ export const verifySubscription = async (req, res, next) => {
                     lecturesCompleted: [],
                     quizScores: [],
                     isCompleted: false
-                });
-
-                // Create Enrollment Entity record
-                await enrollmentModel.create({
-                    student: user._id,
-                    course: courseId
                 });
             }
         }

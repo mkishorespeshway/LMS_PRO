@@ -14,39 +14,11 @@ export default function DisplayLecture() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { state } = useLocation();
-  const { lectures, quizzes } = useSelector((state) => state.lecture);
+  const { lectures } = useSelector((state) => state.lecture);
   const { role, data } = useSelector((state) => state.auth);
 
   const [currentVideo, setCurrentVideo] = useState(0);
-  const [userProgress, setUserProgress] = useState({ lecturesCompleted: [] }); 
-
-  async function handleCertificateDownload() {
-    try {
-      const response = await axiosInstance.get(`/courses/certificate/${state._id}`, {
-        responseType: 'blob', // Important for PDF
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Certificate_${state.title.replace(' ', '_')}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      toast.error("Failed to download certificate. Make sure you have completed the course.");
-    }
-  }
-
-  async function handleMarkAsCompleted(lectureId) {
-    const res = await dispatch(updateProgress({ courseId: state._id, lectureId }));
-    if (res?.payload?.success) {
-      toast.success("Lecture marked as completed");
-      const progressRes = await dispatch(getUserProgress(state._id));
-      if (progressRes?.payload?.success) {
-        setUserProgress(progressRes.payload.progress);
-      }
-    }
-  }
+  const [userProgress, setUserProgress] = useState({ lecturesCompleted: [] }); // New state for user progress
 
   useEffect(() => {
     if (!state) navigate("/courses");
@@ -136,47 +108,6 @@ export default function DisplayLecture() {
                     </span>
                     {lectures && lectures?.[currentVideo]?.description}
                   </p>
-
-                  {/* New: Written Content */}
-                  {lectures && lectures?.[currentVideo]?.content && (
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
-                      <h3 className="text-blue-500 dark:text-yellow-500 font-inter font-semibold text-lg mb-2">Lesson Content:</h3>
-                      <div className="text-gray-700 dark:text-slate-300 whitespace-pre-wrap">
-                        {lectures[currentVideo].content}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* New: Resources */}
-                  {lectures && lectures?.[currentVideo]?.resources && lectures[currentVideo].resources.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-blue-500 dark:text-yellow-500 font-inter font-semibold text-lg mb-2">Resources:</h3>
-                      <ul className="list-disc ml-5">
-                        {lectures[currentVideo].resources.map((res, i) => (
-                          <li key={i}>
-                            <a 
-                              href={res.secure_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              {res.fileName || "Download Resource"}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* New: Mark as Completed Button */}
-                  {role === "USER" && lectures && lectures?.[currentVideo] && !userProgress?.lecturesCompleted?.includes(lectures[currentVideo]._id) && (
-                    <button
-                      onClick={() => handleMarkAsCompleted(lectures[currentVideo]._id)}
-                      className="mt-6 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition-colors"
-                    >
-                      Mark as Completed
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -205,16 +136,6 @@ export default function DisplayLecture() {
                               Add Quiz
                             </button>
                         </div>
-                      )}
-                      {role === "USER" && quizzes && quizzes.length > 0 && (
-                        <button
-                          onClick={() =>
-                            navigate("/course/takequiz", { state: { courseId: state._id, title: state.title } })
-                          }
-                          className="btn-primary px-3 py-2 font-inter rounded-md font-semibold text-sm bg-orange-500 hover:bg-orange-600 text-white"
-                        >
-                          Take Quiz
-                        </button>
                       )}
                   </div>
                   {role === "USER" && (

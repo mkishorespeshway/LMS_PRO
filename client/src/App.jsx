@@ -12,7 +12,6 @@ import AddQuiz from "./Pages/Dashboard/AddQuiz";
 import AdminDashboard from "./Pages/Dashboard/AdminDashboard";
 import EnrolledStudents from './pages/dashboard/EnrolledStudents';
 import DisplayLecture from "./Pages/Dashboard/DisplayLecture";
-import TakeQuiz from "./Pages/Dashboard/TakeQuiz";
 import Denied from "./Pages/Denied";
 import HomePage from "./Pages/HomePage";
 import Login from "./Pages/Login";
@@ -65,7 +64,6 @@ function App() {
           <Route path="/checkout/success" element={<CheckoutSuccess />} />
           <Route path="/checkout/fail" element={<CheckoutFail />} />
           <Route path="/course/displaylectures" element={<DisplayLecture />} />
-          <Route path="/course/takequiz" element={<TakeQuiz />} />
           <Route path="/user/my-courses" element={<MyCourses />} />
         </Route>
 
