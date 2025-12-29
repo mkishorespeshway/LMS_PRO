@@ -15,7 +15,7 @@ const userSchema = new Schema({
     username: {
         type: String,
         unique: true,
-        sparse: true // Allows null values to not violate unique constraint
+        sparse: true // Allows null values to not violate unique constraint.
     },
     email: {
         type: String,
