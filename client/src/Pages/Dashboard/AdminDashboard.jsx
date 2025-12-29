@@ -228,6 +228,7 @@ export default function AdminDashboard() {
                     <th>Course Category</th>
                     <th>Instructor</th>
                     <th>Total Lectures</th>
+                    <th>Price</th>
                     <th>Description</th>
                     <th>Actions</th>
                   </tr>
